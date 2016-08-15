@@ -13,8 +13,6 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-//
-//  PageViewController.swift
 
 import UIKit
 
@@ -57,29 +55,19 @@ class PageViewController: UIViewController {
 	weak var currentViewController: UIViewController? {
 		return viewControllersByPage[currentPage]
 	}
-	//you can either:
-	//implement a dataSource and provide new viewcontrollers when prompted or
-	//specify an array of viewcontroller classes from which PageViewController
-	//will create each page using the provided classes
-	var viewControllerClasses: [UIViewController.Type]? = nil
-	//if you implement a datasource you may either:
+	//to specify your number of viewcontrollers you may either:
 	//1) implement pageViewControllerPageCount to specify the page count
-	//   or return nil in viewControllerForIndex when the last page is request
 	//or
 	//2) specify a pageCount
 	var pageCount: Int {
 		get {
-			var pageCount = 0
-			if let count = viewControllerClasses?.count {
-				pageCount = count
-			}
 			if let count = presetPageCount {
-				pageCount = count
+				return count
 			}
 			if let count = self.dataSource?.pageViewControllerPageCount?(self) {
-				pageCount = count
+				return count
 			}
-			return pageCount
+			return 0
 		}
 		set {
 			presetPageCount = newValue
@@ -88,6 +76,7 @@ class PageViewController: UIViewController {
 			}
 		}
 	}
+
 	func goto(page: Int) {
 		assert(scrollView.superview! == view)
 		DispatchQueue.main.async {
@@ -107,11 +96,6 @@ class PageViewController: UIViewController {
 
 	private var presetPageCount: Int? = nil
 	private func viewController(index: Int) -> UIViewController? {
-		if let requestedClass = viewControllerClasses?[index] {
-			let vc = requestedClass.init()
-			delegate?.pageViewController?(self, createdViewController: vc)
-			return vc
-		}
 		if let count = presetPageCount, index >= count {
 			return nil
 		}
