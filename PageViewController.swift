@@ -19,22 +19,22 @@ import UIKit
 @objc
 protocol PageViewControllerDelegate {
 
-	@objc optional func pageViewController(_ pageViewController: PageViewController, presentedViewController: UIViewController?)
-	@objc optional func pageViewController(_ pageViewController: PageViewController, createdViewController: UIViewController?)
+	@objc optional func pageViewController(pageViewController: PageViewController, presentedViewController: UIViewController?)
+	@objc optional func pageViewController(pageViewController: PageViewController, createdViewController: UIViewController?)
 }
 
 @objc
 protocol PageViewControllerDataSource {
 
-	@objc optional func pageViewController(_ pageViewController: PageViewController, viewControllerForIndex: Int) -> UIViewController?
-	@objc optional func pageViewControllerPageCount(_ pageViewController: PageViewController) -> Int
+	@objc optional func pageViewController(pageViewController: PageViewController, viewControllerForIndex: Int) -> UIViewController?
+	@objc optional func pageViewControllerPageCount(pageViewController: PageViewController) -> Int
 }
 
 @objc
 protocol PageViewControllerClient {
 
-	@objc optional func pageViewControllerActivated(_ pageViewController: PageViewController, previouslyActiveViewController: UIViewController?)
-	@objc optional func pageViewControllerDeactived(_ pageViewController: PageViewController, activeViewController: UIViewController?)
+	@objc optional func pageViewControllerActivated(pageViewController: PageViewController, previouslyActiveViewController: UIViewController?)
+	@objc optional func pageViewControllerDeactived(pageViewController: PageViewController, activeViewController: UIViewController?)
 }
 
 @objc
@@ -120,22 +120,22 @@ class PageViewController: UIViewController {
 		scrollView.scrollsToTop = false
 		scrollView.showsVerticalScrollIndicator = false
 		scrollView.showsHorizontalScrollIndicator = false
-		scrollView.isPagingEnabled = true
+		scrollView.pagingEnabled = true
 		scrollView.translatesAutoresizingMaskIntoConstraints = false
 		scrollView.alwaysBounceVertical = self.direction == .vertical
 		scrollView.alwaysBounceHorizontal = self.direction == .horizontal
-		scrollView.isDirectionalLockEnabled = true
+		scrollView.directionalLockEnabled = true
 		return scrollView
 	}()
 
-	override init(nibName nibNameOrNil: String?, bundle nibBundleOrNil: Bundle?) {
+	override init(nibName nibNameOrNil: String?, bundle nibBundleOrNil: NSBundle?) {
 		super.init(nibName: nil, bundle: nil)
 		for view in containerViews {
 			view.frame = rectClass.offscreen
 		}
 	}
 	deinit {
-		scrollView.removeObserver(self, forKeyPath: NSStringFromSelector(#selector(getter: UIScrollView.bounds)))
+		scrollView.removeObserver(self, forKeyPath: "bounds")
 	}
 
 	required init?(coder aDecoder: NSCoder) {
@@ -155,7 +155,7 @@ extension PageViewController {//MARK: view lifecycle
 			scrollView.addSubview(container)
 		}
 		DispatchQueue.main.async {
-			self.scrollView.addObserver(self, forKeyPath: NSStringFromSelector(#selector(getter: UIScrollView.bounds)), options: .new, context: nil)
+			self.scrollView.addObserver(self, forKeyPath: "bounds", options: .new, context: nil)
 		}
 	}
 
@@ -190,7 +190,8 @@ extension PageViewController {//MARK: frame calculation
 
 extension PageViewController {//MARK: scroll management
 
-	override func observeValue(forKeyPath keyPath: String?, of object: AnyObject?, change: [NSKeyValueChangeKey : AnyObject]?, context: UnsafeMutablePointer<Void>?) {
+	override func observeValueForKeyPath(keyPath: String?, ofObject object: AnyObject?, change: [String : AnyObject]?, context: UnsafeMutablePointer<Void>) {
+
 		guard object === scrollView else {
 			return
 		}
