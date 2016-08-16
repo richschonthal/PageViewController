@@ -96,10 +96,10 @@ class PageViewController: UIViewController {
 
 	private var presetPageCount: Int? = nil
 	private func viewController(index: Int) -> UIViewController? {
-		if let count = presetPageCount, index >= count {
+		if let count = presetPageCount where index >= count {
 			return nil
 		}
-		if let count = dataSource?.pageViewControllerPageCount?(self), index >= count {
+		if let count = dataSource?.pageViewControllerPageCount?(self) where index >= count {
 			return nil
 		}
 		return self.dataSource?.pageViewController?(self, viewControllerForIndex: index)
@@ -113,8 +113,6 @@ class PageViewController: UIViewController {
 	private(set) var currentPage = -1 {
 		willSet {
 			previousPage = currentPage
-		}
-		didSet {
 		}
 	}
 	private(set) lazy var scrollView: UIScrollView = {
@@ -149,6 +147,7 @@ extension PageViewController {//MARK: view lifecycle
 
 	override func loadView() {
 		view = UIView()
+		view.autoresizesSubviews = false
 		view.translatesAutoresizingMaskIntoConstraints = false
 		view.addSubview(scrollView)
 		for container in containerViews {
