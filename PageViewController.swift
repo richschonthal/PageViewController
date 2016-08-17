@@ -79,10 +79,10 @@ class PageViewController: UIViewController {
 
 	func goto(page: Int) {
 		assert(scrollView.superview! == view)
-		DispatchQueue.main.async {
-			if let vc = self.viewController(index: page) {
+		dispatch_async(dispatch_get_main_queue()) { 
+			if let vc = self.viewController(page) {
 				self.setContentSize(self.pageCount)
-				self.attachViewController(viewController: vc, page: page)
+				self.attachViewController(vc, page: page)
 				self.currentPage = page
 				self.scrollView.scrollRectToVisible(self.frameForPage(page), animated: false)
 			}
@@ -91,7 +91,7 @@ class PageViewController: UIViewController {
 
 	enum Traversal { case next, prev }
 	func goto(traversal: Traversal) {
-		goto(page: currentPage + (traversal == .next ? 1 : -1))
+		goto(currentPage + (traversal == .next ? 1 : -1))
 	}
 
 	private var presetPageCount: Int? = nil
@@ -154,8 +154,8 @@ extension PageViewController {//MARK: view lifecycle
 			container.translatesAutoresizingMaskIntoConstraints = false
 			scrollView.addSubview(container)
 		}
-		DispatchQueue.main.async {
-			self.scrollView.addObserver(self, forKeyPath: "bounds", options: .new, context: nil)
+		dispatch_async(dispatch_get_main_queue()) {
+			self.scrollView.addObserver(self, forKeyPath: "bounds", options: .New, context: nil)
 		}
 	}
 
@@ -167,7 +167,7 @@ extension PageViewController {//MARK: view lifecycle
 		}
 	}
 
-	private func setContentSize(_ pageCount: Int) {
+	private func setContentSize(pageCount: Int) {
 		let frame = rectClass.init(view.frame)
 		frame.size.relevant = frame.size.relevant * CGFloat(pageCount)
 		scrollView.contentSize = frame.rect.size
@@ -176,12 +176,12 @@ extension PageViewController {//MARK: view lifecycle
 
 extension PageViewController {//MARK: frame calculation
 
-	private func pageForFrame(_ frame: CGRect) -> CGFloat {
+	private func pageForFrame(frame: CGRect) -> CGFloat {
 		let rect = rectClass.init(frame)
 		return rect.size.relevant == 0 ? -9999999 : rect.origin.relevant / rect.size.relevant
 	}
 
-	private func frameForPage(_ page: Int) -> CGRect {
+	private func frameForPage(page: Int) -> CGRect {
 		let frame = rectClass.init(scrollView.bounds)
 		frame.origin.relevant = frame.size.relevant * CGFloat(page)
 		return frame.rect
@@ -219,22 +219,22 @@ extension PageViewController {//MARK: scroll management
 			if let container = attachView(viewController.view) {
 				addChildViewController(viewController)
 				container.frame = frameForPage(page)
-				viewController.didMove(toParentViewController: self)
+				viewController.didMoveToParentViewController(self)
 			}
 		}
 	}
 
-	private func detachViewController(_ viewController: UIViewController) {
+	private func detachViewController(viewController: UIViewController) {
 
 		if let view = viewController.view {
 			view.superview?.frame = rectClass.offscreen
-			viewController.willMove(toParentViewController: nil)
+			viewController.willMoveToParentViewController(nil)
 			view.removeFromSuperview()
 			viewController.removeFromParentViewController()
 		}
 	}
 
-	private func attachView(_ childView: UIView, offscreen: UIView? = nil) -> UIView? {
+	private func attachView(childView: UIView, offscreen: UIView? = nil) -> UIView? {
 
 		guard let container = offscreen ?? offscreenView() else {
 			return nil
@@ -286,9 +286,9 @@ extension PageViewController {//MARK: scroll management
 
 	private func newlyVisiblePage() -> Int? {
 		
-		var v = visiblePages()
-		v.subtract(containerPages())
-		return v.first
+		return visiblePages()
+			.subtract(containerPages())
+			.first
 	}
 
 	private func attachIncomingViews() {
@@ -303,8 +303,8 @@ extension PageViewController {//MARK: scroll management
 				}
 			}
 		} else {
-			if let vc = self.viewController(index: nextPage) {
-				attachViewController(viewController: vc, page: nextPage)				
+			if let vc = self.viewController(nextPage) {
+				attachViewController(vc, page: nextPage)
 			}
 		}
 	}
@@ -332,7 +332,7 @@ extension PageViewController {//MARK: scroll management
 			}
 		}
 		for page in remove {
-			viewControllersByPage.removeValue(forKey: page)
+			viewControllersByPage.removeValueForKey(page)
 		}
 	}
 }
