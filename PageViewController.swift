@@ -41,14 +41,14 @@ protocol PageViewControllerClient {
 class PageViewController: UIViewController {
 
 	//the paging direction - default = .horizontal
-	enum Direction { case horizontal, vertical }
-	var direction: Direction = .horizontal {
-		didSet {
-			rectClass = (direction == .horizontal) ? HorizontalAgnosticRect.self : VerticalAgnoticRect.self
-			scrollView.alwaysBounceVertical = direction == .vertical
-			scrollView.alwaysBounceHorizontal = direction == .horizontal
-		}
-	}
+//	enum Direction { case horizontal, vertical }
+//	var direction: Direction = .horizontal {
+//		didSet {
+//			rectClass = (direction == .horizontal) ? HorizontalAgnosticRect.self : VerticalAgnoticRect.self
+//			scrollView.alwaysBounceVertical = direction == .vertical
+//			scrollView.alwaysBounceHorizontal = direction == .horizontal
+//		}
+//	}
 	weak var delegate: PageViewControllerDelegate? = nil
 	weak var dataSource: PageViewControllerDataSource? = nil
 
@@ -109,7 +109,7 @@ class PageViewController: UIViewController {
 	private var viewControllersByPage: [Int : UIViewController] = [:]
 
 	private let containerViews: [UIView] =  [UIView(), UIView()]
-	private var rectClass: AgnosticRect.Type = HorizontalAgnosticRect.self
+//	private var rectClass: AgnosticRect.Type = HorizontalAgnosticRect.self
 	private var previousPage = -1
 	private(set) var currentPage = -1 {
 		willSet {
@@ -123,8 +123,10 @@ class PageViewController: UIViewController {
 		scrollView.showsHorizontalScrollIndicator = false
 		scrollView.pagingEnabled = true
 		scrollView.translatesAutoresizingMaskIntoConstraints = false
-		scrollView.alwaysBounceVertical = self.direction == .vertical
-		scrollView.alwaysBounceHorizontal = self.direction == .horizontal
+//		scrollView.alwaysBounceVertical = self.direction == .vertical
+//		scrollView.alwaysBounceHorizontal = self.direction == .horizontal
+		scrollView.alwaysBounceVertical = false
+		scrollView.alwaysBounceHorizontal = true
 		scrollView.directionalLockEnabled = true
 		return scrollView
 	}()
@@ -132,7 +134,7 @@ class PageViewController: UIViewController {
 	override init(nibName nibNameOrNil: String?, bundle nibBundleOrNil: NSBundle?) {
 		super.init(nibName: nil, bundle: nil)
 		for view in containerViews {
-			view.frame = rectClass.offscreen
+			view.frame = HorizontalAgnosticRect.offscreen
 		}
 	}
 	deinit {
@@ -171,7 +173,7 @@ extension PageViewController {//MARK: view lifecycle
 	}
 
 	private func setContentSize(pageCount: Int) {
-		let frame = rectClass.init(view.frame)
+		let frame = HorizontalAgnosticRect(view.frame)
 		frame.size.relevant = frame.size.relevant * CGFloat(pageCount)
 		scrollView.contentSize = frame.rect.size
 	}
@@ -180,12 +182,14 @@ extension PageViewController {//MARK: view lifecycle
 extension PageViewController {//MARK: frame calculation
 
 	private func pageForFrame(frame: CGRect) -> CGFloat {
-		let rect = rectClass.init(frame)
+
+		let rect = HorizontalAgnosticRect(frame)
 		return rect.size.relevant == 0 ? -9999999 : rect.origin.relevant / rect.size.relevant
 	}
 
 	private func frameForPage(page: Int) -> CGRect {
-		let frame = rectClass.init(scrollView.bounds)
+
+		let frame = HorizontalAgnosticRect(scrollView.bounds)
 		frame.origin.relevant = frame.size.relevant * CGFloat(page)
 		return frame.rect
 	}
@@ -194,7 +198,6 @@ extension PageViewController {//MARK: frame calculation
 extension PageViewController {//MARK: scroll management
 
 	override func observeValueForKeyPath(keyPath: String?, ofObject object: AnyObject?, change: [String : AnyObject]?, context: UnsafeMutablePointer<Void>) {
-
 		guard object === scrollView else {
 			return
 		}
@@ -230,7 +233,7 @@ extension PageViewController {//MARK: scroll management
 	private func detachViewController(viewController: UIViewController) {
 
 		if let view = viewController.view {
-			view.superview?.frame = rectClass.offscreen
+			view.superview?.frame = HorizontalAgnosticRect.offscreen
 			viewController.willMoveToParentViewController(nil)
 			view.removeFromSuperview()
 			viewController.removeFromParentViewController()
@@ -270,7 +273,6 @@ extension PageViewController {//MARK: scroll management
 
 	private func newlyPresentedPageNumber() -> Int? {
 		let page = Int(pageForFrame(scrollView.bounds))
-		print(page)
 		if page != currentPage {
 			return page
 		}
@@ -278,7 +280,7 @@ extension PageViewController {//MARK: scroll management
 	}
 
 	private func visiblePages() -> Set<Int> {
-		let rect = rectClass.init(scrollView.bounds)
+		let rect = HorizontalAgnosticRect(scrollView.bounds)
 		rect.origin.relevant += rect.size.relevant - 1
 		return [Int(pageForFrame(scrollView.bounds)), Int(pageForFrame(rect.rect))]
 	}
@@ -317,7 +319,7 @@ extension PageViewController {//MARK: scroll management
 		if let view = offscreenView() {
 			if view.subviews.count > 0 {
 				view.subviews[0].removeFromSuperview()
-				view.frame = rectClass.offscreen
+				view.frame = HorizontalAgnosticRect.offscreen
 			}
 		}
 	}
