@@ -19,7 +19,7 @@ import UIKit
 @objc
 protocol PageViewControllerDelegate {
 
-	@objc optional func pageViewController(pageViewController: PageViewController, presentedViewController: UIViewController?)
+	@objc optional func pageViewController(pageViewController: PageViewController, presentedViewController: UIViewController?, index: Int)
 	@objc optional func pageViewController(pageViewController: PageViewController, createdViewController: UIViewController?)
 }
 
@@ -77,7 +77,7 @@ class PageViewController: UIViewController {
 		}
 	}
 
-	func goto(page: Int) {
+	func gotoPage(page: Int) {
 		assert(scrollView.superview! == view)
 		dispatch_async(dispatch_get_main_queue()) { 
 			if let vc = self.viewController(page) {
@@ -85,13 +85,14 @@ class PageViewController: UIViewController {
 				self.attachViewController(vc, page: page)
 				self.currentPage = page
 				self.scrollView.scrollRectToVisible(self.frameForPage(page), animated: false)
+				self.delegateViewControllerPresentationMessages()
 			}
 		}
 	}
 
 	enum Traversal { case next, prev }
-	func goto(traversal: Traversal) {
-		goto(currentPage + (traversal == .next ? 1 : -1))
+	func gotoPage(traversal: Traversal) {
+		gotoPage(currentPage + (traversal == .next ? 1 : -1))
 	}
 
 	private var presetPageCount: Int? = nil
@@ -145,8 +146,10 @@ class PageViewController: UIViewController {
 
 extension PageViewController {//MARK: view lifecycle
 
+	class PageView: UIView { }
+
 	override func loadView() {
-		view = UIView()
+		view = PageView()
 		view.autoresizesSubviews = false
 		view.translatesAutoresizingMaskIntoConstraints = false
 		view.addSubview(scrollView)
@@ -247,7 +250,7 @@ extension PageViewController {//MARK: scroll management
 	private func delegateViewControllerPresentationMessages() {
 
 		let viewController = viewControllersByPage[currentPage]
-		delegate?.pageViewController?(self, presentedViewController: viewController)
+		delegate?.pageViewController?(self, presentedViewController: viewController, index: currentPage)
 		if let client = viewController as? PageViewControllerClient {
 			client.pageViewControllerActivated?(self, previouslyActiveViewController: viewControllersByPage[previousPage])
 		}
