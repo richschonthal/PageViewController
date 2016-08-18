@@ -41,14 +41,14 @@ protocol PageViewControllerClient {
 class PageViewController: UIViewController {
 
 	//the paging direction - default = .horizontal
-//	enum Direction { case horizontal, vertical }
-//	var direction: Direction = .horizontal {
-//		didSet {
-//			rectClass = (direction == .horizontal) ? HorizontalAgnosticRect.self : VerticalAgnoticRect.self
-//			scrollView.alwaysBounceVertical = direction == .vertical
-//			scrollView.alwaysBounceHorizontal = direction == .horizontal
-//		}
-//	}
+	//	enum Direction { case horizontal, vertical }
+	//	var direction: Direction = .horizontal {
+	//		didSet {
+	//			rectClass = (direction == .horizontal) ? HorizontalAgnosticRect.self : VerticalAgnoticRect.self
+	//			scrollView.alwaysBounceVertical = direction == .vertical
+	//			scrollView.alwaysBounceHorizontal = direction == .horizontal
+	//		}
+	//	}
 	weak var delegate: PageViewControllerDelegate? = nil
 	weak var dataSource: PageViewControllerDataSource? = nil
 
@@ -77,17 +77,32 @@ class PageViewController: UIViewController {
 		}
 	}
 
-	func gotoPage(page: Int) {
-		assert(scrollView.superview! == view)
-		dispatch_async(dispatch_get_main_queue()) { 
-			if let vc = self.viewController(page) {
-				self.setContentSize(self.pageCount)
-				self.attachViewController(vc, page: page)
-				self.currentPage = page
-				self.scrollView.scrollRectToVisible(self.frameForPage(page), animated: false)
-				self.delegateViewControllerPresentationMessages()
+	func reset() {
+		previousPage = -1
+		currentPage = 0
+		presetPageCount = nil
+		viewControllersByPage.removeAll()
+		for current in containerViews {
+			if current.subviews.count > 0 {
+				current.subviews[0].removeFromSuperview()
+				current.hidden = true
 			}
 		}
+	}
+
+	func gotoPage(page: Int, animated: Bool) {
+		assert(scrollView.superview! == view)
+		dispatch_async(dispatch_get_main_queue()) {
+			self.setContentSize(self.pageCount)
+			self.currentPage = page
+			self.scrollView.scrollRectToVisible(self.frameForPage(page), animated: animated)
+			self.attachIncomingViews()
+			self.delegateViewControllerPresentationMessages()
+		}
+	}
+
+	func gotoPage(page: Int) {
+		gotoPage(page, animated: false)
 	}
 
 	enum Traversal { case next, prev }
@@ -96,7 +111,8 @@ class PageViewController: UIViewController {
 	}
 
 	private var presetPageCount: Int? = nil
-	private func viewController(index: Int) -> UIViewController? {
+	private func viewControllerForIndex(index: Int) -> UIViewController? {
+
 		if let count = presetPageCount where index >= count {
 			return nil
 		}
@@ -108,8 +124,14 @@ class PageViewController: UIViewController {
 
 	private var viewControllersByPage: [Int : UIViewController] = [:]
 
-	private let containerViews: [UIView] =  [UIView(), UIView()]
-//	private var rectClass: AgnosticRect.Type = HorizontalAgnosticRect.self
+	private let containerViews: [UIView] = {
+		let containerViews = [PageContainerView(), PageContainerView()]
+		for view in containerViews {
+			view.hidden = true
+		}
+		return containerViews
+	}()
+	//	private var rectClass: AgnosticRect.Type = HorizontalAgnosticRect.self
 	private var previousPage = -1
 	private(set) var currentPage = -1 {
 		willSet {
@@ -117,50 +139,40 @@ class PageViewController: UIViewController {
 		}
 	}
 	private(set) lazy var scrollView: UIScrollView = {
+
 		let scrollView = UIScrollView()
 		scrollView.scrollsToTop = false
 		scrollView.showsVerticalScrollIndicator = false
 		scrollView.showsHorizontalScrollIndicator = false
 		scrollView.pagingEnabled = true
-		scrollView.translatesAutoresizingMaskIntoConstraints = false
-//		scrollView.alwaysBounceVertical = self.direction == .vertical
-//		scrollView.alwaysBounceHorizontal = self.direction == .horizontal
+		scrollView.translatesAutoresizingMaskIntoConstraints = true
+		//		scrollView.alwaysBounceVertical = self.direction == .vertical
+		//		scrollView.alwaysBounceHorizontal = self.direction == .horizontal
 		scrollView.alwaysBounceVertical = false
 		scrollView.alwaysBounceHorizontal = true
 		scrollView.directionalLockEnabled = true
+		scrollView.addObserver(self, forKeyPath: "bounds", options: .New, context: nil)
 		return scrollView
 	}()
 
-	override init(nibName nibNameOrNil: String?, bundle nibBundleOrNil: NSBundle?) {
-		super.init(nibName: nil, bundle: nil)
-		for view in containerViews {
-			view.frame = HorizontalAgnosticRect.offscreen
-		}
-	}
 	deinit {
 		scrollView.removeObserver(self, forKeyPath: "bounds")
-	}
-
-	required init?(coder aDecoder: NSCoder) {
-		fatalError("init(coder:) has not been implemented")
 	}
 }
 
 extension PageViewController {//MARK: view lifecycle
 
 	class PageView: UIView { }
+	class PageContainerView: UIView { }
 
 	override func loadView() {
 		view = PageView()
 		view.autoresizesSubviews = false
-		view.translatesAutoresizingMaskIntoConstraints = false
+		view.translatesAutoresizingMaskIntoConstraints = true
 		view.addSubview(scrollView)
 		for container in containerViews {
-			container.translatesAutoresizingMaskIntoConstraints = false
+			container.translatesAutoresizingMaskIntoConstraints = true
 			scrollView.addSubview(container)
-		}
-		dispatch_async(dispatch_get_main_queue()) {
-			self.scrollView.addObserver(self, forKeyPath: "bounds", options: .New, context: nil)
 		}
 	}
 
@@ -184,7 +196,7 @@ extension PageViewController {//MARK: frame calculation
 	private func pageForFrame(frame: CGRect) -> CGFloat {
 
 		let rect = HorizontalAgnosticRect(frame)
-		return rect.size.relevant == 0 ? -9999999 : rect.origin.relevant / rect.size.relevant
+		return rect.size.relevant == 0 ? -1 : rect.origin.relevant / rect.size.relevant
 	}
 
 	private func frameForPage(page: Int) -> CGRect {
@@ -198,6 +210,7 @@ extension PageViewController {//MARK: frame calculation
 extension PageViewController {//MARK: scroll management
 
 	override func observeValueForKeyPath(keyPath: String?, ofObject object: AnyObject?, change: [String : AnyObject]?, context: UnsafeMutablePointer<Void>) {
+
 		guard object === scrollView else {
 			return
 		}
@@ -206,8 +219,8 @@ extension PageViewController {//MARK: scroll management
 			currentPage = pageNumber!
 		}
 		trimOffscreenViews()
-		trimViewControllers()
 		attachIncomingViews()
+		trimViewControllers()
 		if pageNumber != nil {
 			delegateViewControllerPresentationMessages()
 		}
@@ -233,38 +246,38 @@ extension PageViewController {//MARK: scroll management
 	private func detachViewController(viewController: UIViewController) {
 
 		if let view = viewController.view {
-			view.superview?.frame = HorizontalAgnosticRect.offscreen
+			view.superview?.hidden = true
 			viewController.willMoveToParentViewController(nil)
 			view.removeFromSuperview()
 			viewController.removeFromParentViewController()
 		}
 	}
 
-	private func attachView(childView: UIView, offscreen: UIView? = nil) -> UIView? {
+	private func attachView(childView: UIView) -> UIView? {
 
-		guard let container = offscreen ?? offscreenView() else {
+		guard let container = offscreenView() else {
 			return nil
 		}
 		container.addSubview(childView)
+		container.hidden = false
 		childView.frame = CGRect(origin: .zero, size: container.frame.size)
 		return container
 	}
 
 	private func delegateViewControllerPresentationMessages() {
 
-		let viewController = viewControllersByPage[currentPage]
+		guard let viewController = viewControllersByPage[currentPage] else {
+			return
+		}
+		let previouslyActiveViewController = viewControllersByPage[previousPage]
 		delegate?.pageViewController?(self, presentedViewController: viewController, index: currentPage)
-		if let client = viewController as? PageViewControllerClient {
-			client.pageViewControllerActivated?(self, previouslyActiveViewController: viewControllersByPage[previousPage])
-		}
-		if let previous = viewControllersByPage[previousPage] as? PageViewControllerClient {
-			previous.pageViewControllerDeactived?(self, activeViewController: viewController)
-		}
+		(viewController as? PageViewControllerClient)?.pageViewControllerActivated?(self, previouslyActiveViewController:previouslyActiveViewController)
+		(previouslyActiveViewController as? PageViewControllerClient)?.pageViewControllerDeactived?(self, activeViewController: viewController)
 	}
 
 	private func offscreenView() -> UIView? {
 		for current in containerViews {
-			if !current.frame.intersects(scrollView.bounds) {
+			if current.hidden {
 				return current
 			}
 		}
@@ -284,13 +297,13 @@ extension PageViewController {//MARK: scroll management
 		rect.origin.relevant += rect.size.relevant - 1
 		return [Int(pageForFrame(scrollView.bounds)), Int(pageForFrame(rect.rect))]
 	}
-	
+
 	private func containerPages() -> Set<Int> {
-		return [Int(pageForFrame(containerViews[0].frame)), Int(pageForFrame(containerViews[1].frame))]
+		return [containerViews[0].hidden ? -1 : Int(pageForFrame(containerViews[0].frame)), containerViews[1].hidden ? -2 : Int(pageForFrame(containerViews[1].frame))]
 	}
 
 	private func newlyVisiblePage() -> Int? {
-		
+
 		return visiblePages()
 			.subtract(containerPages())
 			.first
@@ -305,10 +318,11 @@ extension PageViewController {//MARK: scroll management
 			if existingViewController.view.superview == nil {
 				if let container = attachView(existingViewController.view) {
 					container.frame = frameForPage(nextPage)
+					container.hidden = false
 				}
 			}
 		} else {
-			if let vc = self.viewController(nextPage) {
+			if let vc = self.viewControllerForIndex(nextPage) {
 				attachViewController(vc, page: nextPage)
 			}
 		}
@@ -316,10 +330,12 @@ extension PageViewController {//MARK: scroll management
 
 	private func trimOffscreenViews() {
 
-		if let view = offscreenView() {
-			if view.subviews.count > 0 {
-				view.subviews[0].removeFromSuperview()
-				view.frame = HorizontalAgnosticRect.offscreen
+		for current in containerViews {
+			if !current.frame.intersects(scrollView.bounds) {
+				if current.subviews.count > 0 {
+					current.subviews[0].removeFromSuperview()
+				}
+				current.hidden = true
 			}
 		}
 	}
@@ -356,7 +372,6 @@ private protocol AgnosticRect: CustomStringConvertible {
 	var origin: AgnosticDuple { get }
 	var size: AgnosticDuple { get }
 	var rect: CGRect { get }
-	static var offscreen: CGRect { get }
 	init(_ frame: CGRect)
 	init(_ size: CGSize)
 	init(_ rect: AgnosticRect)
@@ -365,9 +380,7 @@ private protocol AgnosticRect: CustomStringConvertible {
 extension PageViewController {
 
 	private class HorizontalAgnosticRect: AgnosticRect {
-		static var offscreen: CGRect {
-			return CGRect(x: -999999, y: 0, width: 1, height: 1)
-		}
+
 		var description: String {
 			return String(rect)
 		}
@@ -390,9 +403,7 @@ extension PageViewController {
 		}
 	}
 	private class VerticalAgnoticRect: AgnosticRect {
-		static var offscreen: CGRect {
-			return CGRect(x: 0, y: -9999999, width: 1, height: 1)
-		}
+
 		var description: String {
 			return String(rect)
 		}
