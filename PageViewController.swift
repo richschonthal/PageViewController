@@ -184,6 +184,11 @@ extension PageViewController {//MARK: view lifecycle
 		}
 	}
 
+	override func viewDidAppear(animated: Bool) {
+		super.viewDidAppear(animated)
+		self.manageViews()
+	}
+
 	private func setContentSize(pageCount: Int) {
 		let frame = HorizontalAgnosticRect(view.frame)
 		frame.size.relevant = frame.size.relevant * CGFloat(pageCount)
@@ -214,15 +219,21 @@ extension PageViewController {//MARK: scroll management
 		guard object === scrollView else {
 			return
 		}
-		let pageNumber = newlyPresentedPageNumber()
-		if pageNumber != nil {
-			currentPage = pageNumber!
+		dispatch_async(dispatch_get_main_queue()) {
+			self.manageViews()
 		}
-		trimOffscreenViews()
-		attachIncomingViews()
-		trimViewControllers()
+	}
+
+	private func manageViews() {
+		let pageNumber = self.newlyPresentedPageNumber()
 		if pageNumber != nil {
-			delegateViewControllerPresentationMessages()
+			self.currentPage = pageNumber!
+		}
+		self.trimOffscreenViews()
+		self.attachIncomingViews()
+		self.trimViewControllers()
+		if pageNumber != nil {
+			self.delegateViewControllerPresentationMessages()
 		}
 	}
 
@@ -269,10 +280,12 @@ extension PageViewController {//MARK: scroll management
 		guard let viewController = viewControllersByPage[currentPage] else {
 			return
 		}
-		let previouslyActiveViewController = viewControllersByPage[previousPage]
-		delegate?.pageViewController?(self, presentedViewController: viewController, index: currentPage)
-		(viewController as? PageViewControllerClient)?.pageViewControllerActivated?(self, previouslyActiveViewController:previouslyActiveViewController)
-		(previouslyActiveViewController as? PageViewControllerClient)?.pageViewControllerDeactived?(self, activeViewController: viewController)
+		dispatch_async(dispatch_get_main_queue()) {
+			let previouslyActiveViewController = self.viewControllersByPage[self.previousPage]
+			self.delegate?.pageViewController?(self, presentedViewController: viewController, index: self.currentPage)
+			(viewController as? PageViewControllerClient)?.pageViewControllerActivated?(self, previouslyActiveViewController:previouslyActiveViewController)
+			(previouslyActiveViewController as? PageViewControllerClient)?.pageViewControllerDeactived?(self, activeViewController: viewController)
+		}
 	}
 
 	private func offscreenView() -> UIView? {
