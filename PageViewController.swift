@@ -151,6 +151,7 @@ class PageViewController: UIViewController {
 		scrollView.alwaysBounceVertical = false
 		scrollView.alwaysBounceHorizontal = true
 		scrollView.directionalLockEnabled = true
+		scrollView.frame = CGRect(origin: .zero, size: self.view.frame.size)
 		scrollView.addObserver(self, forKeyPath: "bounds", options: .New, context: nil)
 		return scrollView
 	}()
@@ -190,6 +191,7 @@ extension PageViewController {//MARK: view lifecycle
 	}
 
 	private func setContentSize(pageCount: Int) {
+		scrollView.frame = CGRect(origin: .zero, size: view.frame.size)
 		let frame = HorizontalAgnosticRect(view.frame)
 		frame.size.relevant = frame.size.relevant * CGFloat(pageCount)
 		scrollView.contentSize = frame.rect.size
