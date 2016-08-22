@@ -90,14 +90,29 @@ class PageViewController: UIViewController {
 		}
 	}
 
+	private let queue: NSOperationQueue = {
+		let q = NSOperationQueue()
+		q.underlyingQueue = dispatch_queue_create(nil, DISPATCH_QUEUE_SERIAL)
+		return q
+	}()
+	private var deiniting = false
+
 	func gotoPage(page: Int, animated: Bool) {
 		assert(scrollView.superview! == view)
-		dispatch_async(dispatch_get_main_queue()) {
-			self.setContentSize(self.pageCount)
-			self.currentPage = page
-			self.scrollView.scrollRectToVisible(self.frameForPage(page), animated: animated)
-			self.attachIncomingViews()
-			self.delegateViewControllerPresentationMessages()
+		queue.addOperationWithBlock { [weak self] in
+			guard let me = self else {
+				return
+			}
+			if me.deiniting {
+				return
+			}
+			dispatch_async(dispatch_get_main_queue(), {
+				me.setContentSize(me.pageCount)
+				me.currentPage = page
+				me.scrollView.scrollRectToVisible(me.frameForPage(page), animated: animated)
+				me.attachIncomingViews()
+				me.delegateViewControllerPresentationMessages()
+			})
 		}
 	}
 
@@ -158,6 +173,8 @@ class PageViewController: UIViewController {
 
 	deinit {
 		scrollView.removeObserver(self, forKeyPath: "bounds")
+		self.deiniting = true
+		self.queue.cancelAllOperations()
 	}
 }
 
@@ -179,10 +196,12 @@ extension PageViewController {//MARK: view lifecycle
 
 	override func viewDidLayoutSubviews() {
 		super.viewDidLayoutSubviews()
-		scrollView.frame = CGRect(origin: .zero, size: view.frame.size)
+		let frame = HorizontalAgnosticRect.init(CGRect(origin: .zero, size: view.frame.size))
+		scrollView.frame = frame.rect
 		for current in containerViews {
 			current.frame = CGRect(origin: current.frame.origin, size: view.frame.size)
 		}
+		self.queue.suspended = frame.size.relevant == 0
 	}
 
 	override func viewDidAppear(animated: Bool) {
@@ -191,7 +210,6 @@ extension PageViewController {//MARK: view lifecycle
 	}
 
 	private func setContentSize(pageCount: Int) {
-		scrollView.frame = CGRect(origin: .zero, size: view.frame.size)
 		let frame = HorizontalAgnosticRect(view.frame)
 		frame.size.relevant = frame.size.relevant * CGFloat(pageCount)
 		scrollView.contentSize = frame.rect.size
