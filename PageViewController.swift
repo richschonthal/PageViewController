@@ -169,7 +169,7 @@ class PageViewController: UIViewController {
 		if self.lastKnownGoodSize != nil {
 			return CGRect(origin: self.scrollView.bounds.origin, size: self.lastKnownGoodSize!)
 		}
-		return CGRect(origin: self.scrollView.bounds.origin, size: CGSize(width: 44, height: 44))
+		return CGRect(origin: self.scrollView.bounds.origin, size: UIApplication.sharedApplication().keyWindow!.bounds.size)
 	}
 }
 
