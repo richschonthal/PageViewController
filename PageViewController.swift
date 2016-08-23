@@ -90,30 +90,15 @@ class PageViewController: UIViewController {
 		}
 	}
 
-	private let queue: NSOperationQueue = {
-		let q = NSOperationQueue()
-		q.underlyingQueue = dispatch_queue_create(nil, DISPATCH_QUEUE_SERIAL)
-		return q
-	}()
-	private var deiniting = false
-
 	func gotoPage(page: Int, animated: Bool) {
 		assert(scrollView.superview! == view)
-		queue.addOperationWithBlock { [weak self] in
-			guard let me = self else {
-				return
-			}
-			if me.deiniting {
-				return
-			}
-			dispatch_async(dispatch_get_main_queue(), {
-				me.setContentSize(me.pageCount)
-				me.currentPage = page
-				me.scrollView.scrollRectToVisible(me.frameForPage(page), animated: animated)
-				me.attachIncomingViews()
-				me.delegateViewControllerPresentationMessages()
-			})
-		}
+		dispatch_async(dispatch_get_main_queue(), {
+			self.setContentSize(self.pageCount)
+			self.currentPage = page
+			self.scrollView.scrollRectToVisible(self.frameForPage(page), animated: animated)
+			self.attachIncomingViews()
+			self.delegateViewControllerPresentationMessages()
+		})
 	}
 
 	func gotoPage(page: Int) {
@@ -173,8 +158,18 @@ class PageViewController: UIViewController {
 
 	deinit {
 		scrollView.removeObserver(self, forKeyPath: "bounds")
-		self.deiniting = true
-		self.queue.cancelAllOperations()
+	}
+
+	private var lastKnownGoodSize: CGSize? = nil
+	private var currentPageBounds: CGRect {
+		if self.scrollView.bounds.size.width > 0 && self.scrollView.bounds.size.height > 0 {
+			self.lastKnownGoodSize = self.scrollView.bounds.size
+			return self.scrollView.bounds
+		}
+		if self.lastKnownGoodSize != nil {
+			return CGRect(origin: self.scrollView.bounds.origin, size: self.lastKnownGoodSize!)
+		}
+		return CGRect(origin: self.scrollView.bounds.origin, size: CGSize(width: 44, height: 44))
 	}
 }
 
@@ -201,7 +196,6 @@ extension PageViewController {//MARK: view lifecycle
 		for current in containerViews {
 			current.frame = CGRect(origin: current.frame.origin, size: view.frame.size)
 		}
-		self.queue.suspended = frame.size.relevant == 0
 	}
 
 	override func viewDidAppear(animated: Bool) {
@@ -226,7 +220,7 @@ extension PageViewController {//MARK: frame calculation
 
 	private func frameForPage(page: Int) -> CGRect {
 
-		let frame = HorizontalAgnosticRect(scrollView.bounds)
+		let frame = HorizontalAgnosticRect(self.currentPageBounds)
 		frame.origin.relevant = frame.size.relevant * CGFloat(page)
 		return frame.rect
 	}
@@ -318,7 +312,7 @@ extension PageViewController {//MARK: scroll management
 	}
 
 	private func newlyPresentedPageNumber() -> Int? {
-		let page = Int(pageForFrame(scrollView.bounds))
+		let page = Int(pageForFrame(self.currentPageBounds))
 		if page != currentPage {
 			return page
 		}
@@ -326,9 +320,9 @@ extension PageViewController {//MARK: scroll management
 	}
 
 	private func visiblePages() -> Set<Int> {
-		let rect = HorizontalAgnosticRect(scrollView.bounds)
+		let rect = HorizontalAgnosticRect(self.currentPageBounds)
 		rect.origin.relevant += rect.size.relevant - 1
-		return [Int(pageForFrame(scrollView.bounds)), Int(pageForFrame(rect.rect))]
+		return [Int(pageForFrame(self.currentPageBounds)), Int(pageForFrame(rect.rect))]
 	}
 
 	private func containerPages() -> Set<Int> {
@@ -364,7 +358,7 @@ extension PageViewController {//MARK: scroll management
 	private func trimOffscreenViews() {
 
 		for current in containerViews {
-			if !current.frame.intersects(scrollView.bounds) {
+			if !current.frame.intersects(self.currentPageBounds) {
 				if current.subviews.count > 0 {
 					current.subviews[0].removeFromSuperview()
 				}
